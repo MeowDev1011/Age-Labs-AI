@@ -119,9 +119,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
 
 ## 🧪 Testing
 
-To test the application:
+To test the application live:
 
-1. Visit the live demo: [🌐 Age Labs AI](https://github.com/MeowDev1011/Age-Labs-AI)
+1. **Visit the live demo**: [🌐 https://age-labs-ai.ai.studio/](https://age-labs-ai.ai.studio/)
 2. Upload a photo and try different age transformations
 3. Test various filters and preferences
 
@@ -195,7 +195,7 @@ Have questions or found a bug? 🐛
 
 ## 🚀 Try It Out Now!
 
-**[🌐 Visit Age Labs AI](https://github.com/MeowDev1011/Age-Labs-AI)**
+**[🌐 Visit Age Labs AI](https://age-labs-ai.ai.studio/)**
 
 ---
 
