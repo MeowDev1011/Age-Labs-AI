@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <title>Age-Labes AI</title>
+    <meta name="description" content="Age-Labes AI - Transforma visualmente la edad de una persona en una foto manteniendo su identidad original con Inteligencia Artificial." />
+    
+    <!-- Android & PWA Meta Tags -->
+    <meta name="theme-color" content="#000000" id="theme-color-meta" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Age-Labes AI" />
+    <meta name="application-name" content="Age-Labes AI" />
+    <meta name="msapplication-TileColor" content="#000000" />
+
+    <!-- OpenGraph -->
+    <meta property="og:title" content="Age-Labes AI" />
+    <meta property="og:description" content="Age-Labes AI - Transforma visualmente la edad de una persona en una foto manteniendo su identidad original con Inteligencia Artificial." />
+    <meta property="og:image" content="/pwa-512x512.png" />
+    <meta property="og:type" content="website" />
+
+    <!-- Icons & Manifest -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="alternate icon" type="image/png" href="/pwa-192x192.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/index.css">
+    <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.19.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+  }
+}
+</script>
+  </head>
+  <body class="bg-black text-white selection:bg-sky-500 selection:text-white transition-colors duration-200">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

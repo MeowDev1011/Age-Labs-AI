@@ -1,0 +1,10 @@
+{
+  "name": "Age-Labes AI",
+  "description": "Transform visually the age of a person in a photo while keeping their original identity with AI. Multi-language and adaptive device theme.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
