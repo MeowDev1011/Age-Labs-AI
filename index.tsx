@@ -3,8 +3,13 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { registerSW } from 'virtual:pwa-register';
 
-// Register service worker for Android PWA installation and offline caching
-registerSW({ immediate: true });
+// Register service worker and ensure immediate cache refreshing
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    updateSW(true);
+  },
+});
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

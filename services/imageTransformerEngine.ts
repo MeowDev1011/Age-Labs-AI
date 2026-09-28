@@ -14,12 +14,14 @@ export const processLocalTransformation = async (
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-
       const dataUrl = base64Data.startsWith('data:')
         ? base64Data
         : `data:${mimeType || 'image/jpeg'};base64,${base64Data}`;
+
+      const img = new Image();
+      if (!dataUrl.startsWith('data:')) {
+        img.crossOrigin = 'anonymous';
+      }
 
       img.onload = () => {
         try {
