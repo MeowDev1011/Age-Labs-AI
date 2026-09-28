@@ -121,7 +121,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
 
 To test the application:
 
-1. Visit the live demo: [🌐 Age Labs AI](https://github.com/MeowDev1011/Age-Labs-AI) 
+1. Visit the live demo: [🌐 Age Labs AI](https://github.com/MeowDev1011/Age-Labs-AI)
 2. Upload a photo and try different age transformations
 3. Test various filters and preferences
 
