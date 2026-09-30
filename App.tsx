@@ -110,7 +110,8 @@ const AppContent: React.FC = () => {
         targetAge,
         transformType,
         selectedStyleId,
-        customStylePrompt
+        customStylePrompt,
+        personName
       );
 
       if (result.image) {
@@ -141,19 +142,12 @@ const AppContent: React.FC = () => {
           try { navigator.vibrate([30, 50, 30]); } catch {}
         }
       } else {
-        const fallbackUrl = originalImage.base64.startsWith('data:')
-          ? originalImage.base64
-          : `data:${originalImage.mimeType || 'image/jpeg'};base64,${originalImage.base64}`;
-        setTransformedImage(fallbackUrl);
-        setCreatorState('result');
+        throw new Error('La IA no devolvió una imagen transformada.');
       }
     } catch (err: any) {
-      console.warn('Transformation seamlessly handled:', err);
-      const fallbackUrl = originalImage.base64.startsWith('data:')
-        ? originalImage.base64
-        : `data:${originalImage.mimeType || 'image/jpeg'};base64,${originalImage.base64}`;
-      setTransformedImage(fallbackUrl);
-      setCreatorState('result');
+      console.error('Error during transformation:', err);
+      setCreatorState('preview');
+      setError(err.message || 'Error al procesar la imagen con IA. Intenta nuevamente.');
     }
   };
 
@@ -172,14 +166,18 @@ const AppContent: React.FC = () => {
         targetAge,
         transformType,
         newStyleId,
-        customPrompt
+        customPrompt,
+        personName
       );
 
       if (result.image) {
         setTransformedImage(result.image);
+      } else {
+        throw new Error('No se pudo aplicar el nuevo estilo.');
       }
     } catch (err: any) {
-      console.warn('Reapply style seamlessly handled:', err);
+      console.error('Reapply style error:', err);
+      setError(err.message || 'No se pudo aplicar el estilo con IA.');
     } finally {
       setIsReapplyingStyle(false);
     }

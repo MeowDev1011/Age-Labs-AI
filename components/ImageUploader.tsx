@@ -3,6 +3,7 @@ import type { ImageData } from '../types';
 import { CameraCapture } from './CameraCapture';
 import { useI18n } from '../context/I18nContext';
 import { useTheme } from '../context/ThemeContext';
+import { processAndNormalizeImage } from '../utils/imageProcessor';
 
 interface ImageUploaderProps {
   onImageUpload: (imageData: ImageData) => void;
@@ -61,58 +62,19 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload }) =
     ? 'border-blue-900/60 hover:border-sky-400 bg-[#0a1128]/80 hover:bg-[#121f47]/80'
     : 'border-zinc-800 hover:border-sky-500 bg-zinc-900/60 hover:bg-zinc-900';
 
-  const processImageFile = (file: Blob | File) => {
+  const processImageFile = async (file: Blob | File) => {
     setIsProcessing(true);
     setError(null);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const dataUrl = e.target?.result as string;
-        if (!dataUrl || !dataUrl.includes(',')) {
-          throw new Error('Formato de imagen inválido.');
-        }
-
-        const parts = dataUrl.split(',');
-        const base64 = parts[1];
-
-        // Determine real mimeType
-        let mimeType = 'image/jpeg';
-        const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+_-]+);base64,/);
-        if (match && match[1]) {
-          mimeType = match[1];
-        } else if (file.type && file.type.startsWith('image/')) {
-          mimeType = file.type;
-        }
-
-        // Test loading the image in memory to ensure it's not corrupt
-        const img = new Image();
-        img.onload = () => {
-          setIsProcessing(false);
-          // Pass the robust dataUrl directly so it never expires or breaks in <img>
-          onImageUpload({
-            url: dataUrl,
-            base64,
-            mimeType,
-          });
-        };
-        img.onerror = () => {
-          setIsProcessing(false);
-          setError('El archivo seleccionado no es una imagen válida o está dañado.');
-        };
-        img.src = dataUrl;
-      } catch (err: any) {
-        setIsProcessing(false);
-        setError(err.message || 'No se pudo leer el archivo de imagen.');
-      }
-    };
-
-    reader.onerror = () => {
+    try {
+      const imageData = await processAndNormalizeImage(file);
       setIsProcessing(false);
-      setError('Ocurrió un error al leer el archivo desde el dispositivo.');
-    };
-
-    reader.readAsDataURL(file);
+      onImageUpload(imageData);
+    } catch (err: any) {
+      console.error('Error processing image:', err);
+      setIsProcessing(false);
+      setError('No se pudo procesar la imagen seleccionada. Intenta con otra foto en JPG o PNG.');
+    }
   };
 
   const handleFileChange = useCallback(
@@ -190,7 +152,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageUpload }) =
         <input
           id="file-upload-input"
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif,.jpg,.jpeg,.png,.webp,.avif,.bmp,.tiff"
           className="hidden"
           onChange={(e) => handleFileChange(e.target.files)}
         />
