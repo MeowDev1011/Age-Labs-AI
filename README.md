@@ -2,31 +2,36 @@
 
 > *See your future self or revisit your past with AI-powered age progression & regression* ✨
 
-![TypeScript](https://img.shields.io/badge/TypeScript-93.3%25-3178c6?style=for-the-badge)
-![JavaScript](https://img.shields.io/badge/JavaScript-4.3%25-F7DF1E?style=for-the-badge)
-![CSS](https://img.shields.io/badge/CSS-1.3%25-1572B6?style=for-the-badge)
-![HTML](https://img.shields.io/badge/HTML-1.1%25-E34C26?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-94%25-3178c6?style=for-the-badge)
+![JavaScript](https://img.shields.io/badge/JavaScript-3.8%25-F7DF1E?style=for-the-badge)
+![CSS](https://img.shields.io/badge/CSS-1.2%25-1572B6?style=for-the-badge)
+![HTML](https://img.shields.io/badge/HTML-1%25-E34C26?style=for-the-badge)
 
 ## 🌍 Overview
 
-Age Labs AI is a cutting-edge web application powered by Google's **Gemini API** that generates realistic images showing how you might look in the future or how you looked in the past. With support for **10+ languages** and multiple filters, this app brings age progression and regression technology to your fingertips! 🚀
+Age Labs AI is a modern React + TypeScript web app that lets users upload a portrait and transform it with AI to simulate age progression or age regression. The app uses Pollinations.ai to generate the transformed image directly in the browser, supports multiple styles, and includes a multilingual interface, camera capture, history gallery, and responsive theming.
+
+This project is designed as a fast, privacy-conscious local-first experience: the user selects a photo, customizes the transformation, generates the result, and can save or reuse creations from the gallery.
 
 ## ✨ Features
 
-- 🤖 **AI-Powered Image Generation** - Uses Google Gemini API for realistic age transformations
-- 🌐 **Multi-Language Support** - 10+ languages for global accessibility
-- 🎨 **Advanced Filters** - Customize your transformation with various filter options
-- 📱 **Responsive Design** - Works seamlessly on desktop, tablet, and mobile devices
-- ⚡ **Fast Processing** - Quick image generation with optimized performance
-- 🎯 **User-Friendly Interface** - Intuitive controls for easy navigation
+- 🤖 **AI-powered age transformation** with Pollinations.ai
+- ⏳ **Age progression and regression** with adjustable target age
+- 🎨 **Multiple visual styles** such as realistic, oil painting, anime, marble, neon, and custom prompts
+- 📸 **Image upload and camera capture** support
+- 🌐 **Multi-language interface** with 20+ supported languages
+- 🌓 **Theme support** with light, dark, and navy modes
+- 🖼️ **Creation history gallery** saved locally in the browser
+- 📱 **Responsive mobile-friendly interface** with Android-style bottom navigation
+- ⚡ **Fast Vite-based frontend** with real-time UI updates
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js (v14 or higher)
-- npm or yarn package manager
-- Google Gemini API key ([Get one here](https://ai.google.dev/))
+- Node.js 18+
+- npm, pnpm, or Bun
+- A browser with camera permissions if you want to use the quick-capture flow
 
 ### Installation
 
@@ -40,130 +45,147 @@ Age Labs AI is a cutting-edge web application powered by Google's **Gemini API**
    ```bash
    npm install
    # or
-   yarn install
+   bun install
    ```
 
-3. **Set up environment variables**
+3. **Configure environment variables (optional)**
    ```bash
    cp .env.example .env.local
    ```
-   Add your Gemini API key:
-   ```
-   NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here
-   ```
+
+   The app can run without a custom API key because it uses Pollinations.ai directly. The sample file contains optional Gemini variables if future integrations are added.
 
 4. **Run the development server**
    ```bash
    npm run dev
    # or
-   yarn dev
+   bun run dev
    ```
 
-5. **Open in browser**
-   Navigate to `http://localhost:3000` 🎉
+5. **Open the app**
+   Visit `http://localhost:5173` in your browser.
 
 ## 💻 How to Use
 
-1. **Upload a Photo** 📸
-   - Click the upload button and select a clear facial photo
-   - Ensure good lighting for best results
+1. **Upload or capture a photo** 📸
+   - Use the upload area or the quick camera option
+   - Pick a clear portrait with visible facial features for better results
 
-2. **Select Your Preference** 🎯
-   - Choose between:
-     - ⏳ **Age Progression**: See yourself older
-     - ⏮️ **Age Regression**: See yourself younger
-   - Select the number of years to transform
+2. **Choose the transformation** 🎯
+   - Select the target age
+   - Choose whether you want to age forward or reverse
+   - Add a person name if you want the prompt to be more personalized
 
-3. **Apply Filters** (Optional) 🎨
-   - Choose from various filter options to customize the look
-   - Preview changes in real-time
+3. **Select a style** 🎨
+   - Use a preset like Realista, Oil Painting, Anime, Marble, Neon, or a custom prompt
 
-4. **Generate Image** ✨
-   - Click "Generate" and wait for the AI magic ✨
-   - The transformed image will appear on screen
+4. **Generate the image** ✨
+   - Click the transform button and wait for Pollinations.ai to respond
 
-5. **Download or Share** 📥
-   - Save your transformed image
-   - Share on social media
+5. **Review and save** 📥
+   - Compare the generated result
+   - Save it to the gallery or reapply a new style if needed
 
 ## 🛠️ Technology Stack
 
-- **Frontend**: TypeScript, React, Next.js
-- **Styling**: CSS, Tailwind CSS (if applicable)
-- **API**: Google Gemini API
-- **Package Manager**: npm/yarn
+- **Frontend**: React 19, TypeScript, Vite
+- **Styling**: CSS, custom design system, responsive UI
+- **AI Generation**: Pollinations.ai image API
+- **State & UX**: React hooks, context providers, local history persistence
+- **Package Manager**: npm / Bun
+- **PWA support**: Vite plugin for progressive web app features
 
 ## 📦 Project Structure
 
-```
+```text
 Age-Labs-AI/
-├── public/              # Static assets
-├── src/
-│   ├── components/      # React components
-│   ├── pages/           # Next.js pages
-│   ├── styles/          # CSS files
-│   └── utils/           # Utility functions
-├── .env.example         # Environment variables template
-├── package.json         # Project dependencies
-└── README.md           # This file
+├── components/          # Reusable UI components
+├── constants/           # App constants and style definitions
+├── context/             # Theme and i18n providers
+├── hooks/               # Custom hooks
+├── i18n/                # Language list and translations
+├── public/              # Static public assets
+├── scripts/             # Project scripts
+├── services/            # AI generation and local persistence logic
+├── utils/               # Utility helpers
+├── App.tsx              # Main application container
+├── index.css            # Global styles
+├── index.html           # Vite entry point
+├── index.tsx            # React bootstrap
+├── metadata.json        # App metadata
+├── package.json         # Dependencies and scripts
+├── .env.example         # Optional environment variables template
+├── types.ts             # Shared TypeScript types
+├── tsconfig.json        # TypeScript config
+├── vite.config.ts       # Vite configuration
+├── LICENSE              # License
+├── README.md            # Project documentation
+└── vite-env.d.ts       # Vite TypeScript definitions
 ```
 
 ## 🔑 Environment Variables
 
-Required environment variables:
+The project includes a sample environment file:
 
 ```env
-NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
+# Optional Gemini API Key (kept for compatibility with future integrations)
+GEMINI_API_KEY=
+VITE_GEMINI_API_KEY=
 ```
 
-## 🧪 Testing
+In the current version, the main image generation flow is handled directly through Pollinations.ai via the frontend service layer, so no API key is strictly required for the default workflow.
 
-To test the application live:
+## 🧪 Validation & Build
 
-1. **Visit the live demo**: [🌐 https://age-labs-ai.ai.studio/](https://age-labs-ai.ai.studio/)
-2. Upload a photo and try different age transformations
-3. Test various filters and preferences
+To verify the project still builds correctly:
 
-## 📖 API Documentation
-
-### Generate Image Endpoint
-
-```
-POST /api/generate
-Content-Type: application/json
-
-{
-  "imageBase64": "base64_encoded_image",
-  "ageYears": 10,
-  "mode": "progression" | "regression",
-  "filters": ["filter1", "filter2"],
-  "language": "en"
-}
+```bash
+npm run build
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "imageUrl": "generated_image_url",
-  "timestamp": "2026-09-28T00:00:00Z"
-}
-```
+This command checks that the Vite app compiles successfully for production.
+
+## 📖 AI Workflow
+
+The app does not currently use a server-side API route. Instead, it calls the Pollinations.ai image endpoint from the client via the service layer:
+
+- `services/pollinationsService.ts` builds the portrait generation prompt
+- `services/geminiService.ts` exposes the AI transform function used by the app
+- `App.tsx` orchestrates upload, age settings, image generation, and result handling
+
+This keeps the app simple and allows direct AI transformations without requiring a custom backend.
 
 ## 🌍 Supported Languages
 
-- 🇬🇧 English
+The interface supports the following languages:
+
 - 🇪🇸 Spanish
+- 🇬🇧 English
+- 🇵🇹 Portuguese
 - 🇫🇷 French
 - 🇩🇪 German
 - 🇮🇹 Italian
 - 🇯🇵 Japanese
 - 🇰🇷 Korean
-- 🇨🇳 Chinese (Simplified & Traditional)
-- 🇵🇹 Portuguese
+- 🇨🇳 Chinese
 - 🇷🇺 Russian
-- *(and more!)*
+- 🇸🇦 Arabic
+- 🇮🇳 Hindi
+- 🇹🇷 Turkish
+- 🇳🇱 Dutch
+- 🇵🇱 Polish
+- 🇮🇩 Indonesian
+- 🇻🇳 Vietnamese
+- 🇹🇭 Thai
+- 🇸🇪 Swedish
+- 🇬🇷 Greek
+- 🇨🇿 Czech
+- 🇺🇦 Ukrainian
+- 🇷🇴 Romanian
+- 🇭🇺 Hungarian
+- 🇮🇱 Hebrew
+- 🇩🇰 Danish
+- 🇳🇴 Norwegian
 
 ## 🤝 Contributing
 
@@ -181,9 +203,10 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- Google Gemini API for powerful AI capabilities
+- Pollinations.ai for the image generation backend
+- React and Vite for the frontend foundation
+- The open-source community for the awesome libraries and tooling
 - All contributors and testers
-- The open-source community
 
 ## 📧 Support & Contact
 
@@ -191,7 +214,7 @@ Have questions or found a bug? 🐛
 
 - 📌 Open an [Issue](https://github.com/MeowDev1011/Age-Labs-AI/issues)
 - 💬 Start a [Discussion](https://github.com/MeowDev1011/Age-Labs-AI/discussions)
-- 📮 Reach out via email
+- 🧑‍💻 Visit the repository: [MeowDev1011/Age-Labs-AI](https://github.com/MeowDev1011/Age-Labs-AI)
 
 ## 🚀 Try It Out Now!
 
