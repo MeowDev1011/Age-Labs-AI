@@ -9,6 +9,7 @@ import { Gallery } from './components/Gallery';
 import { CameraCapture } from './components/CameraCapture';
 import { AndroidBottomNav } from './components/AndroidBottomNav';
 import { SettingsModal } from './components/SettingsModal';
+import { WaitingScreen } from './components/WaitingScreen';
 import { transformImageAge } from './services/geminiService';
 import { getHistory, addCreation, removeCreation, clearHistory } from './services/historyService';
 import { I18nProvider, useI18n } from './context/I18nContext';
@@ -22,8 +23,12 @@ interface ConfirmDialogState {
   onConfirm: () => void;
 }
 
+const GENERATION_COOLDOWN_MS = 120000;
+const MAX_GENERATION_RETRIES = 2;
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const AppContent: React.FC = () => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { resolvedTheme } = useTheme();
 
   const [creatorState, setCreatorState] = useState<CreatorState>('initial');
@@ -41,6 +46,8 @@ const AppContent: React.FC = () => {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [showQuickCamera, setShowQuickCamera] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [generationCooldownEndsAt, setGenerationCooldownEndsAt] = useState<number>(0);
+  const [showWaitingScreen, setShowWaitingScreen] = useState<boolean>(false);
 
   useEffect(() => {
     setCreations(getHistory());
@@ -61,6 +68,7 @@ const AppContent: React.FC = () => {
     setCustomStylePrompt('');
     setError(null);
     setCreatorState('initial');
+    setShowWaitingScreen(false);
   };
 
   const handleSaveCreation = (
@@ -96,59 +104,84 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    setCreatorState('transforming');
-    setError(null);
-
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      try { navigator.vibrate(20); } catch {}
+    const cooldownRemaining = Math.max(0, generationCooldownEndsAt - Date.now());
+    if (cooldownRemaining > 0) {
+      const remainingSeconds = Math.ceil(cooldownRemaining / 1000);
+      setError(`Por favor espera ${remainingSeconds}s antes de generar otra imagen.`);
+      return;
     }
 
-    try {
-      const result = await transformImageAge(
-        originalImage.base64,
-        originalImage.mimeType,
-        targetAge,
-        transformType,
-        selectedStyleId,
-        customStylePrompt,
-        personName
-      );
+    const executeGeneration = async (attempt: number = 0): Promise<void> => {
+      setCreatorState('transforming');
+      setShowWaitingScreen(true);
+      setError(null);
 
-      if (result.image) {
-        setTransformedImage(result.image);
-        setCreatorState('result');
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate(20); } catch {}
+      }
 
-        // Automatic save to history
-        const finalPerson = personName.trim() || 'Persona';
-        const currentStyle = STYLE_FILTERS.find((s) => s.id === selectedStyleId);
-        const styleName = selectedStyleId === 'custom' && customStylePrompt
-          ? `Personalizado (${customStylePrompt.slice(0, 16)}...)`
-          : currentStyle?.name || 'Ultra Realista';
-
-        const newCreation = addCreation({
-          name: `${finalPerson} (${targetAge} años) - ${styleName}`,
-          personName: finalPerson,
-          originalImage: originalImage.url,
-          transformedImage: result.image,
+      try {
+        const result = await transformImageAge(
+          originalImage.base64,
+          originalImage.mimeType,
           targetAge,
           transformType,
-          styleId: selectedStyleId,
-          styleName,
-          customPrompt: customStylePrompt,
-        });
-        setCreations((prev) => [newCreation, ...prev]);
+          selectedStyleId,
+          customStylePrompt,
+          personName
+        );
 
-        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          try { navigator.vibrate([30, 50, 30]); } catch {}
+        if (result.image) {
+          setTransformedImage(result.image);
+          setCreatorState('result');
+          setShowWaitingScreen(false);
+          setGenerationCooldownEndsAt(Date.now() + GENERATION_COOLDOWN_MS);
+
+          const finalPerson = personName.trim() || 'Persona';
+          const currentStyle = STYLE_FILTERS.find((s) => s.id === selectedStyleId);
+          const styleName = selectedStyleId === 'custom' && customStylePrompt
+            ? `Personalizado (${customStylePrompt.slice(0, 16)}...)`
+            : currentStyle?.name || 'Ultra Realista';
+
+          const newCreation = addCreation({
+            name: `${finalPerson} (${targetAge} años) - ${styleName}`,
+            personName: finalPerson,
+            originalImage: originalImage.url,
+            transformedImage: result.image,
+            targetAge,
+            transformType,
+            styleId: selectedStyleId,
+            styleName,
+            customPrompt: customStylePrompt,
+          });
+          setCreations((prev) => [newCreation, ...prev]);
+
+          if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+            try { navigator.vibrate([30, 50, 30]); } catch {}
+          }
+        } else {
+          throw new Error('La IA no devolvió una imagen transformada.');
         }
-      } else {
-        throw new Error('La IA no devolvió una imagen transformada.');
+      } catch (err: any) {
+        const message = err?.message || 'Error al procesar la imagen con IA. Intenta nuevamente.';
+        const shouldRetry = /429|Too Many Requests|rate limit|Límite|ocupad|saturad/i.test(message) && attempt < MAX_GENERATION_RETRIES;
+
+        if (shouldRetry) {
+          const retryDelay = 15000 * (attempt + 1);
+          setShowWaitingScreen(true);
+          setError(`Los servidores están ocupados. Reintentando en ${Math.ceil(retryDelay / 1000)}s...`);
+          await wait(retryDelay);
+          return executeGeneration(attempt + 1);
+        }
+
+        console.error('Error during transformation:', err);
+        setCreatorState('preview');
+        setShowWaitingScreen(false);
+        setError(message);
       }
-    } catch (err: any) {
-      console.error('Error during transformation:', err);
-      setCreatorState('preview');
-      setError(err.message || 'Error al procesar la imagen con IA. Intenta nuevamente.');
-    }
+    };
+
+    await executeGeneration();
   };
 
   const handleReapplyStyle = async (newStyleId: string, customPrompt: string) => {
@@ -243,7 +276,7 @@ const AppContent: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="absolute top-3 right-3 px-3.5 py-1.5 rounded-full bg-black/75 backdrop-blur-md text-white font-bold text-xs hover:bg-black/90 border border-white/20 transition-all shadow-md active:scale-95"
+                  className="absolute top-3 right-3 px-3.5 py-1.5 rounded-full bg-black/75 backdrop-blur-md text-white font-bold text-xs hover:bg-black/90 border border-white/20 transition-all shadow-lg"
                 >
                   {t('newPhoto')}
                 </button>
@@ -273,7 +306,7 @@ const AppContent: React.FC = () => {
               type="button"
               onClick={handleTransform}
               disabled={!targetAge || !transformType}
-              className="w-full py-4 px-6 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-600 hover:from-sky-400 hover:to-purple-500 disabled:opacity-50 text-white font-black text-sm rounded-2xl shadow-xl shadow-sky-500/25 transition-all transform active:scale-98 flex items-center justify-center gap-2"
+              className="w-full py-4 px-6 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-600 hover:from-sky-400 hover:to-purple-500 disabled:opacity-50 text-white font-black text-sm rounded-2xl shadow-lg shadow-indigo-500/30 transition-all"
             >
               <span>{t('transformButton')}</span>
             </button>
@@ -312,10 +345,8 @@ const AppContent: React.FC = () => {
     <div
       className={`min-h-screen flex flex-col items-center p-3 sm:p-5 pb-24 transition-colors duration-200 select-none ${containerThemeClass}`}
     >
-      {/* Error alert modal */}
       {error && <ErrorDisplay message={error} onDismiss={() => setError(null)} />}
 
-      {/* Confirmation Dialog */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex justify-center items-center z-50 p-4 animate-fadeIn">
           <div
@@ -347,7 +378,6 @@ const AppContent: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Camera Modal */}
       {showQuickCamera && (
         <CameraCapture
           onCapture={handleQuickCameraCapture}
@@ -355,14 +385,22 @@ const AppContent: React.FC = () => {
         />
       )}
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         defaultTab="theme"
       />
 
-      {/* Top Header */}
+      {showWaitingScreen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
+          <WaitingScreen
+            duration={120}
+            language={language}
+            onComplete={() => setShowWaitingScreen(false)}
+          />
+        </div>
+      )}
+
       <div className="w-full max-w-xl mb-4">
         <Header
           view={view}
@@ -371,7 +409,6 @@ const AppContent: React.FC = () => {
         />
       </div>
 
-      {/* Main View Area */}
       <main className="w-full max-w-xl flex-1 flex flex-col items-center">
         {view === 'creator' ? (
           renderCreatorContent()
@@ -384,7 +421,6 @@ const AppContent: React.FC = () => {
         )}
       </main>
 
-      {/* Android Mobile Bottom Nav */}
       <AndroidBottomNav
         view={view}
         onNavigate={handleNavigate}
