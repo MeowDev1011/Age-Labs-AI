@@ -55,10 +55,44 @@ const generatePrompt = (
 };
 
 /**
+ * Uses Gemini 3.8 Flash Vision (free tier active in preview) to extract the person's visual traits
+ * so Puter.js / Pollinations.ai preserve the person's facial appearance.
+ */
+const extractPersonDescriptionWithGemini = async (
+  ai: GoogleGenAI | null,
+  rawBase64: string,
+  mimeType: string
+): Promise<string> => {
+  if (!ai) return '';
+  try {
+    const visionPromise = ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inlineData: { data: rawBase64, mimeType } },
+            {
+              text: 'Describe this person in 18 concise English words for a portrait prompt: gender, ethnicity, skin tone, hair style/color, eye color, facial hair or glasses if any, and expression.',
+            },
+          ],
+        },
+      ],
+    });
+
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+    const res: any = await Promise.race([visionPromise, timeoutPromise]);
+    return res?.text ? res.text.trim().replace(/\n+/g, ' ') : '';
+  } catch {
+    return '';
+  }
+};
+
+/**
  * 3-Stage Real AI Transformation Pipeline:
- * 1. Google Gemini AI (gemini-3.1-flash-lite-image)
- * 2. Puter.js AI (puter.ai.txt2img with input_image)
- * 3. Pollinations.ai Neural Generator
+ * 1. Priority 1: Google Gemini AI (gemini-3.1-flash-lite-image)
+ * 2. Priority 2: Puter.js AI (puter.ai.txt2img with input_image)
+ * 3. Emergency Priority 3: Pollinations.ai Neural Generator (assisted by Gemini Vision traits)
  */
 export const transformImageAge = async (
   base64ImageData: string,
@@ -76,8 +110,12 @@ export const transformImageAge = async (
   const prompt = generatePrompt(targetAge, transformType, styleId, customStylePrompt, personName);
   const errors: string[] = [];
 
-  // 1. Intento 1: Google Gemini AI
   const ai = getAIClient();
+
+  // Start Gemini Vision trait extraction in background (non-blocking) for fallback accuracy
+  const visionTraitsPromise = extractPersonDescriptionWithGemini(ai, rawBase64, safeMime);
+
+  // 1. PRIORIDAD 1: Google Gemini AI
   if (ai) {
     try {
       const apiPromise = ai.models.generateContent({
@@ -98,7 +136,7 @@ export const transformImageAge = async (
       });
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Gemini timeout')), 6000)
+        setTimeout(() => reject(new Error('Gemini timeout')), 4500)
       );
 
       const response: any = await Promise.race([apiPromise, timeoutPromise]);
@@ -114,16 +152,16 @@ export const transformImageAge = async (
           }
         }
       }
-      errors.push('Gemini no devolvió imagen');
+      errors.push('Gemini sin imagen');
     } catch (geminiErr: any) {
-      console.warn('Gemini falló, intentando con Puter.js:', geminiErr?.message || geminiErr);
-      errors.push(`Gemini: ${geminiErr?.status || geminiErr?.message || 'Error de cuota'}`);
+      console.warn('Prioridad 1 (Gemini) falló, pasando a Prioridad 2 (Puter.js):', geminiErr?.message || geminiErr);
+      errors.push(`Gemini: ${geminiErr?.status || 'cuota agotada'}`);
     }
   } else {
-    errors.push('Gemini: Sin API Key configurada');
+    errors.push('Gemini: sin clave');
   }
 
-  // 2. Intento 2: Puter.js AI
+  // 2. PRIORIDAD 2: Puter.js AI
   try {
     const puterImage = await generateWithPuter(prompt, rawBase64, safeMime);
     if (puterImage && puterImage.length > 50) {
@@ -132,20 +170,22 @@ export const transformImageAge = async (
         text: null,
       };
     }
-    errors.push('Puter.js no devolvió imagen');
+    errors.push('Puter.js sin imagen');
   } catch (puterErr: any) {
-    console.warn('Puter.js falló, intentando con Pollinations.ai:', puterErr?.message || puterErr);
-    errors.push(`Puter.js: ${puterErr?.message || 'No disponible'}`);
+    console.warn('Prioridad 2 (Puter.js) falló, activando emergencia Pollinations.ai:', puterErr?.message || puterErr);
+    errors.push(`Puter.js: ${puterErr?.message || 'no disponible'}`);
   }
 
-  // 3. Intento 3: Pollinations.ai
+  // 3. EMERGENCIA (PRIORIDAD 3): Pollinations.ai
   try {
+    const visualDescription = await visionTraitsPromise;
     const pollinationsImage = await generateWithPollinations(
       targetAge,
       transformType,
       styleId,
       customStylePrompt,
-      personName
+      personName,
+      visualDescription
     );
     if (pollinationsImage && pollinationsImage.length > 50) {
       return {
@@ -153,13 +193,13 @@ export const transformImageAge = async (
         text: null,
       };
     }
-    errors.push('Pollinations.ai no devolvió imagen');
+    errors.push('Pollinations sin imagen');
   } catch (pollinationsErr: any) {
-    console.error('Pollinations.ai también falló:', pollinationsErr?.message || pollinationsErr);
-    errors.push(`Pollinations: ${pollinationsErr?.message || 'Error de conexión'}`);
+    console.error('Emergencia Pollinations.ai también falló:', pollinationsErr?.message || pollinationsErr);
+    errors.push(`Pollinations: ${pollinationsErr?.message || 'error'}`);
   }
 
   throw new Error(
-    `No se pudo generar la imagen con IA tras intentar los 3 motores (${errors.join(' | ')}). Por favor intenta nuevamente.`
+    `No se pudo completar la transformación (${errors.join(' → ')}). Intenta nuevamente.`
   );
 };

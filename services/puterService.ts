@@ -1,6 +1,6 @@
 /**
- * Puter.js AI Image Transformation Service
- * Uses puter.ai.txt2img with input_image support for image-to-image age & style transformation.
+ * Puter.js AI Image Transformation Service (Priority 2)
+ * Uses puter.ai.txt2img with input_image support and fast timeout for iframe previews.
  */
 
 declare global {
@@ -41,7 +41,7 @@ const ensurePuterLoaded = async (): Promise<void> => {
         if (window.puter?.ai?.txt2img) {
           clearInterval(interval);
           resolve();
-        } else if (checks > 30) {
+        } else if (checks > 20) {
           clearInterval(interval);
           reject(new Error('Timeout waiting for Puter.js to initialize'));
         }
@@ -74,7 +74,6 @@ const normalizeImageResult = async (res: HTMLImageElement | string): Promise<str
     return src;
   }
 
-  // Convert blob: or http: URL to data:image base64 for persistent gallery & download support
   try {
     const response = await fetch(src);
     const blob = await response.blob();
@@ -108,7 +107,7 @@ export const generateWithPuter = async (
 
   const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
     new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Puter.js timeout')), ms);
+      const timer = setTimeout(() => reject(new Error('Puter.js timeout in preview')), ms);
       promise
         .then((val) => {
           clearTimeout(timer);
@@ -120,36 +119,15 @@ export const generateWithPuter = async (
         });
     });
 
-  // Attempt 1: Image-to-Image with input_image (Gemini / Nano Banana via Puter)
-  try {
-    const imgRes = await withTimeout(
-      txt2img(prompt, {
-        model: 'gemini-2.5-flash-image-preview',
-        input_image: rawBase64,
-        input_image_mime_type: safeMime,
-      }),
-      15000
-    );
-    return await normalizeImageResult(imgRes);
-  } catch (err1) {
-    console.warn('Puter.js Attempt 1 (gemini-2.5-flash-image-preview with input_image) failed:', err1);
-  }
+  // Fast 5.5s timeout so sandboxed preview iframes (which block Puter login popups) immediately fall back to Pollinations.ai
+  const imgRes = await withTimeout(
+    txt2img(prompt, {
+      model: 'gemini-2.5-flash-image-preview',
+      input_image: rawBase64,
+      input_image_mime_type: safeMime,
+    }),
+    5500
+  );
 
-  // Attempt 2: Image-to-Image with default Puter model + input_image
-  try {
-    const imgRes = await withTimeout(
-      txt2img(prompt, {
-        input_image: rawBase64,
-        input_image_mime_type: safeMime,
-      }),
-      15000
-    );
-    return await normalizeImageResult(imgRes);
-  } catch (err2) {
-    console.warn('Puter.js Attempt 2 (default model with input_image) failed:', err2);
-  }
-
-  // Attempt 3: Standard Puter txt2img
-  const imgRes = await withTimeout(txt2img(prompt, false), 15000);
   return await normalizeImageResult(imgRes);
 };

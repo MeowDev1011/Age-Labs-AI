@@ -23,8 +23,8 @@ interface ConfirmDialogState {
   onConfirm: () => void;
 }
 
-const GENERATION_COOLDOWN_MS = 120000;
-const MAX_GENERATION_RETRIES = 2;
+const GENERATION_COOLDOWN_MS = 2000;
+const MAX_GENERATION_RETRIES = 1;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const AppContent: React.FC = () => {
@@ -394,7 +394,7 @@ const AppContent: React.FC = () => {
       {showWaitingScreen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm">
           <WaitingScreen
-            duration={120}
+            duration={18}
             language={language}
             onComplete={() => setShowWaitingScreen(false)}
           />

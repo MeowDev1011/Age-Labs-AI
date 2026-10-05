@@ -1,109 +1,121 @@
 /**
- * Pollinations.ai Real AI Image Generation Engine
- * Direct neural image generation without Gemini.
+ * Pollinations.ai Real AI Image Generation Engine (Emergency Fallback - Priority 3)
+ * Works in both AI Studio Preview (via /api/pollinations proxy) and production domains.
  */
+
+const blobToDataUrl = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
 export const generateWithPollinations = async (
   targetAge: number,
   transformType: 'progress' | 'regress',
   styleId: string = 'realista',
   customPrompt: string = '',
-  personName: string = ''
+  personName: string = '',
+  personVisualDescription: string = ''
 ): Promise<string> => {
   const ageDesc =
     transformType === 'regress'
-      ? `youthful person looking exactly ${targetAge} years old, youthful fresh glowing face, smooth skin, lively eyes`
-      : `distinguished elder person looking exactly ${targetAge} years old, realistic silver white hair, mature facial character wrinkles, natural aged expression`;
+      ? `youthful person looking ${targetAge} years old, fresh smooth skin, bright eyes`
+      : `elderly person looking ${targetAge} years old, natural silver white hair, realistic facial wrinkles`;
 
-  let styleDesc = 'hyperrealistic 8k cinematic portrait photograph, sharp focus, natural skin texture, masterpiece';
+  let styleDesc = 'hyperrealistic 8k studio portrait photograph, sharp focus, natural skin texture';
 
   if (customPrompt && customPrompt.trim()) {
     styleDesc = customPrompt.trim();
   } else {
     switch (styleId) {
       case 'oleo':
-        styleDesc = 'classical master oil painting, Rembrandt chiaroscuro golden lighting, rich canvas texture';
+        styleDesc = 'classical master oil painting portrait, Rembrandt chiaroscuro golden lighting';
         break;
       case 'ceramica':
-        styleDesc = 'fine glazed porcelain ceramic sculpture portrait, high gloss finish, delicate alabaster';
+        styleDesc = 'fine glazed porcelain ceramic sculpture portrait, high gloss alabaster';
         break;
       case 'robotico':
-        styleDesc = 'futuristic cyborg humanoid robot portrait, titanium chrome plates, glowing blue cybernetic circuits';
+        styleDesc = 'futuristic cyborg humanoid robot portrait, titanium chrome plates, glowing blue circuits';
         break;
       case 'anime':
-        styleDesc = 'vibrant anime aesthetic portrait, Makoto Shinkai style, crisp cel-shaded lines, luminous lighting';
+        styleDesc = 'vibrant anime aesthetic portrait, Makoto Shinkai style, cel-shaded, luminous lighting';
         break;
       case 'acuarela':
-        styleDesc = 'expressive watercolor painting, flowing colorful pigments, fine paper wash bleed, artistic splash';
+        styleDesc = 'expressive watercolor painting portrait, flowing pigments, fine paper texture';
         break;
       case 'marmol':
-        styleDesc = 'classical Roman Carrara white marble sculpture bust, museum pedestal lighting, smooth stone texture';
+        styleDesc = 'classical Roman Carrara white marble sculpture bust, museum lighting';
         break;
       case 'glamour':
-        styleDesc = 'retro 1980s synthwave glamour portrait, soft focus magenta and cyan bloom, vintage film';
+        styleDesc = 'retro 1980s synthwave glamour portrait, soft focus magenta and cyan glow';
         break;
       case 'neon':
-        styleDesc = 'cyberpunk neon lighting portrait, electric cyan and vivid magenta rim light, dark futuristic backdrop';
+        styleDesc = 'cyberpunk neon lighting portrait, electric cyan and vivid magenta rim light';
         break;
       case 'cabana':
-        styleDesc = 'rustic cozy cabin portrait, warm fireplace amber glow, timber cabin ambiance, golden hour';
+        styleDesc = 'rustic cozy cabin portrait, warm fireplace amber glow, golden hour';
         break;
       case 'realista':
       default:
-        styleDesc = 'hyperrealistic 8k cinematic portrait photograph, studio lighting, natural skin pores and tones';
+        styleDesc = 'hyperrealistic 8k cinematic portrait photograph, studio lighting, natural skin pores';
         break;
     }
   }
 
-  const nameContext = personName && personName.trim() ? `named ${personName.trim()}` : '';
-  const fullPrompt = `close up portrait of a person ${nameContext}, ${ageDesc}, ${styleDesc}, looking at camera, award winning portrait photography`;
+  const subjectDesc = personVisualDescription.trim()
+    ? personVisualDescription.trim()
+    : personName.trim()
+    ? `person named ${personName.trim()}`
+    : 'person';
+
+  const fullPrompt = `close up portrait of ${subjectDesc}, ${ageDesc}, ${styleDesc}, looking at camera`;
   const cleanPrompt = encodeURIComponent(fullPrompt);
-  const seed = Math.floor(Math.random() * 10000000);
+  const seed = Math.floor(Math.random() * 100000);
+  const query = `?width=512&height=512&nologo=true&seed=${seed}`;
 
-  const url = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=768&height=768&nologo=true&seed=${seed}`;
+  // Endpoint 1: Local Vite Proxy (/api/pollinations) — injects Referer: https://pollinations.ai/ so preview works 100%
+  // Endpoint 2: Direct Pollinations with no-referrer policy for static domains
+  const endpoints = [
+    `/api/pollinations/prompt/${cleanPrompt}${query}`,
+    `https://image.pollinations.ai/prompt/${cleanPrompt}${query}`,
+  ];
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  let lastError = 'No se pudo conectar con Pollinations.ai';
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Accept: 'image/jpeg,image/png,image/*',
-      },
-      signal: controller.signal,
-    });
+  for (const url of endpoints) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 14000);
 
-    clearTimeout(timeoutId);
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        referrerPolicy: 'no-referrer',
+        headers: {
+          Accept: 'image/jpeg,image/png,image/*',
+        },
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      if (response.status === 402) {
-        throw new Error('Pollinations AI requiere pago o sus servidores están saturados (Error 402). Por favor intenta de nuevo.');
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('image')) {
+          const blob = await response.blob();
+          if (blob.size > 1000) {
+            return await blobToDataUrl(blob);
+          }
+        }
+      } else {
+        lastError = `HTTP ${response.status}`;
       }
-      if (response.status === 429) {
-        throw new Error('Límite de solicitudes de Pollinations AI alcanzado (Error 429). Espera unos segundos.');
-      }
-      throw new Error(`La IA de Pollinations devolvió error HTTP ${response.status}.`);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      lastError = err?.name === 'AbortError' ? 'Timeout' : err?.message || 'Error de red';
     }
-
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('image')) {
-      const text = await response.text();
-      throw new Error(`Respuesta no válida de la IA: ${text.slice(0, 100)}`);
-    }
-
-    const blob = await response.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Tiempo de espera agotado al conectar con Pollinations AI (más de 12 segundos).');
-    }
-    throw err;
   }
+
+  throw new Error(`Pollinations.ai no disponible (${lastError})`);
 };
