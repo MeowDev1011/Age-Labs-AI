@@ -9,21 +9,22 @@
 
 ## 🌍 Overview
 
-Age Labs AI is a modern React + TypeScript web app that lets users upload a portrait and transform it with AI to simulate age progression or age regression. The app uses Pollinations.ai to generate realistic or stylized portraits based on age transformations, custom prompts, and visual filters.
+Age Labs AI is a modern React + TypeScript web app that lets users upload a portrait and transform it with AI to simulate age progression or age regression. The app uses a multi-engine image pipeline that tries Google Gemini first, then Puter.js, and finally Pollinations.ai to generate realistic or stylized portraits based on age transformations, custom prompts, and visual filters.
 
 This project is designed as a fast, privacy-conscious local-first experience: the user selects a photo, customizes the transformation, generates the result, and can save or reuse creations from their own browser gallery.
 
 ## ✨ Features
 
-- 🤖 **AI-powered age transformation** with Pollinations.ai
+- 🤖 **AI-powered age transformation** with a multi-provider pipeline
 - ⏳ **Age progression and regression** with adjustable target age
-- 🎨 **Multiple visual styles** such as realistic, oil painting, anime, marble, neon, and custom prompts
-- 📸 **Image upload and camera capture** support
-- 🌐 **Multi-language interface** with 20+ supported languages
+- 🎨 **Multiple visual styles** such as ultra realistic, ceramic, cabin, robotic, oil painting, anime, marble, noir, watercolor, and neon
+- 📸 **Image upload, camera capture, and HEIC image handling** support
+- 🌐 **Multi-language interface** with 25+ supported languages
 - 🌓 **Theme support** with light, dark, and navy modes
 - 🖼️ **Creation history gallery** saved locally in the browser
 - 📱 **Responsive mobile-friendly interface** with Android-style bottom navigation
 - ⚡ **Fast Vite-based frontend** with real-time UI updates
+- 📦 **PWA-ready setup** for installable app behavior
 
 ## 🚀 Getting Started
 
@@ -53,7 +54,7 @@ This project is designed as a fast, privacy-conscious local-first experience: th
    cp .env.example .env.local
    ```
 
-   The app can run without a custom API key because it uses Pollinations.ai directly. The sample file contains optional Gemini variables if future integrations are added.
+   The app can run without a custom API key because it falls back between multiple AI providers. The sample file includes optional Gemini variables for compatibility with the primary generation engine.
 
 4. **Run the development server**
    ```bash
@@ -77,10 +78,10 @@ This project is designed as a fast, privacy-conscious local-first experience: th
    - Add a person name if you want the prompt to be more personalized
 
 3. **Select a style** 🎨
-   - Use a preset like Realista, Oil Painting, Anime, Marble, Neon, or a custom prompt
+   - Use a preset like Ultra Realista, Painting, Anime, Marble, Neon, or a custom prompt
 
 4. **Generate the image** ✨
-   - Click the transform button and wait for Pollinations.ai to respond
+   - Click the transform button and wait for the AI pipeline to respond
 
 5. **Review and save** 📥
    - Compare the generated result
@@ -90,10 +91,12 @@ This project is designed as a fast, privacy-conscious local-first experience: th
 
 - **Frontend**: React 19, TypeScript, Vite
 - **Styling**: CSS, custom design system, responsive UI
-- **AI Generation**: Pollinations.ai image API
+- **AI Generation**: Google GenAI, Puter.js, and Pollinations.ai
+- **Image handling**: HEIC conversion support via `heic2any`
 - **State & UX**: React hooks, context providers, local history persistence
 - **Package Manager**: npm / Bun
 - **PWA support**: Vite plugin for progressive web app features
+- **Icons**: `lucide-react`
 
 ## 📦 Project Structure
 
@@ -107,6 +110,10 @@ Age-Labs-AI/
 ├── public/              # Static public assets
 ├── scripts/             # Project scripts
 ├── services/            # AI generation and local persistence logic
+│   ├── geminiService.ts # Primary AI transformation pipeline
+│   ├── puterService.ts  # Puter.js fallback generator
+│   ├── pollinationsService.ts # Pollinations fallback generator
+│   └── historyService.ts # Local gallery persistence
 ├── utils/               # Utility helpers
 ├── App.tsx              # Main application container
 ├── index.css            # Global styles
@@ -128,12 +135,12 @@ Age-Labs-AI/
 The project includes a sample environment file:
 
 ```env
-# Optional Gemini API Key (kept for compatibility with future integrations)
+# Optional Gemini API Key (used by the primary AI generation engine)
 GEMINI_API_KEY=
 VITE_GEMINI_API_KEY=
 ```
 
-In the current version, the main image generation flow is handled directly through Pollinations.ai via the frontend service layer, so no API key is strictly required for the default workflow.
+In the current version, the app tries multiple generation providers in sequence. If Gemini is unavailable or missing a key, the flow falls back to Puter.js and then Pollinations.ai.
 
 ## 🧪 Validation & Build
 
@@ -147,13 +154,14 @@ This command checks that the Vite app compiles successfully for production.
 
 ## 📖 AI Workflow
 
-The app does not currently use a server-side API route. Instead, it calls the Pollinations.ai image endpoint from the client via the service layer:
+The app does not rely on a single backend route. Instead, the transformation flow is handled from the frontend service layer in `services/geminiService.ts`:
 
-- `services/pollinationsService.ts` builds the portrait generation prompt
-- `services/geminiService.ts` exposes the AI transform function used by the app
+- Google Gemini is attempted first with `@google/genai`
+- Puter.js is used as a fallback if Gemini is unavailable
+- Pollinations.ai is the final fallback for image generation
 - `App.tsx` orchestrates upload, age settings, image generation, and result handling
 
-This keeps the app simple and allows direct AI transformations without requiring a custom backend.
+This keeps the app lightweight while supporting multiple AI backends and letting the user keep working without a custom server-side API requirement.
 
 ## 🌍 Supported Languages
 
@@ -203,7 +211,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- Pollinations.ai for the image generation backend
+- Google Gemini for the primary AI generation path
+- Puter.js and Pollinations.ai for additional generation fallback support
 - React and Vite for the frontend foundation
 - The open-source community for the awesome libraries and tooling
 - All contributors and testers
