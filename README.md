@@ -9,9 +9,9 @@
 
 ## 🌍 Overview
 
-Age Labs AI is a modern React + TypeScript web app that lets users upload a portrait and transform it with AI to simulate age progression or age regression. The app uses Pollinations.ai to generate the transformed image directly in the browser, supports multiple styles, and includes a multilingual interface, camera capture, history gallery, and responsive theming.
+Age Labs AI is a modern React + TypeScript web app that lets users upload a portrait and transform it with AI to simulate age progression or age regression. The app uses Pollinations.ai to generate realistic or stylized portraits based on age transformations, custom prompts, and visual filters.
 
-This project is designed as a fast, privacy-conscious local-first experience: the user selects a photo, customizes the transformation, generates the result, and can save or reuse creations from the gallery.
+This project is designed as a fast, privacy-conscious local-first experience: the user selects a photo, customizes the transformation, generates the result, and can save or reuse creations from their own browser gallery.
 
 ## ✨ Features
 
@@ -218,7 +218,7 @@ Have questions or found a bug? 🐛
 
 ## 🚀 Try It Out Now!
 
-**[🌐 Visit Age Labs AI](https://age-labs-ai.ai.studio/)**
+**[🌐 Visit Age Labs AI](https://age-labs.ai.studio/)**
 
 ---
 
