@@ -1,6 +1,7 @@
 /**
- * Pollinations.ai Real AI Image Generation Engine (Emergency Fallback - Priority 3)
- * Works in both AI Studio Preview (via /api/pollinations proxy) and production domains.
+ * Pollinations.ai Real AI Image Generation Engine (Priority 3)
+ * Works in both AI Studio Preview (via /api/pollinations proxy) and production domains,
+ * preserving the uploaded image's aspect ratio dimensions.
  */
 
 const blobToDataUrl = (blob: Blob): Promise<string> =>
@@ -17,7 +18,9 @@ export const generateWithPollinations = async (
   styleId: string = 'realista',
   customPrompt: string = '',
   personName: string = '',
-  personVisualDescription: string = ''
+  personVisualDescription: string = '',
+  width: number = 768,
+  height: number = 768
 ): Promise<string> => {
   const ageDesc =
     transformType === 'regress'
@@ -73,10 +76,10 @@ export const generateWithPollinations = async (
   const fullPrompt = `close up portrait of ${subjectDesc}, ${ageDesc}, ${styleDesc}, looking at camera`;
   const cleanPrompt = encodeURIComponent(fullPrompt);
   const seed = Math.floor(Math.random() * 100000);
-  const query = `?width=512&height=512&nologo=true&seed=${seed}`;
+  const safeW = Math.max(512, Math.min(1024, Math.round(width / 64) * 64));
+  const safeH = Math.max(512, Math.min(1024, Math.round(height / 64) * 64));
+  const query = `?width=${safeW}&height=${safeH}&nologo=true&seed=${seed}`;
 
-  // Endpoint 1: Local Vite Proxy (/api/pollinations) — injects Referer: https://pollinations.ai/ so preview works 100%
-  // Endpoint 2: Direct Pollinations with no-referrer policy for static domains
   const endpoints = [
     `/api/pollinations/prompt/${cleanPrompt}${query}`,
     `https://image.pollinations.ai/prompt/${cleanPrompt}${query}`,

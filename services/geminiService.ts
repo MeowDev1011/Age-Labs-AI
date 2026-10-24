@@ -3,6 +3,11 @@ import type { TransformResult, TransformType } from '../types';
 import { STYLE_FILTERS } from '../constants/styles';
 import { generateWithPuter } from './puterService';
 import { generateWithPollinations } from './pollinationsService';
+import { generateWithFourthBackupAI } from './fluxService';
+import {
+  getUploadedImageDimensions,
+  enforceExactAspectRatio,
+} from '../utils/aspectRatio';
 
 const getAIClient = (): GoogleGenAI | null => {
   try {
@@ -30,12 +35,14 @@ const generatePrompt = (
   transformType: TransformType,
   styleId?: string,
   customStylePrompt?: string,
-  personName?: string
+  personName?: string,
+  personVisualDescription?: string,
+  aspectRatioLabel?: string
 ): string => {
   const ageInstruction =
     transformType === 'regress'
-      ? `Rejuvenecer a la persona en la imagen para que aparente exactamente ${targetAge} años de edad, piel fresca, suave y luminosa.`
-      : `Envejecer a la persona en la imagen para que aparente exactamente ${targetAge} años de edad, con signos naturales del paso del tiempo, canas realistas y líneas de expresión auténticas.`;
+      ? `Transformar y rejuvenecer a la persona para que aparente exactamente ${targetAge} años de edad, piel joven, fresca, suave y luminosa.`
+      : `Transformar y envejecer a la persona para que aparente exactamente ${targetAge} años de edad, con signos naturales del paso del tiempo, cabello canoso/plateado realista y líneas de expresión auténticas.`;
 
   let styleInstruction = '';
   if (customStylePrompt && customStylePrompt.trim().length > 0) {
@@ -46,18 +53,19 @@ const generatePrompt = (
       styleInstruction = `ESTILO ARTÍSTICO (${selectedStyle.name}): ${selectedStyle.promptModifier}. Mantén el rostro y parecido de la persona.`;
     }
   } else {
-    styleInstruction = `ESTILO VISUAL: Fotorrealismo ultra detallado 8K, iluminación fotográfica de estudio, textura de piel natural.`;
+    styleInstruction = `ESTILO VISUAL: Retrato fotográfico hiperrealista 8K, iluminación cinematográfica de estudio, textura de piel natural.`;
   }
 
   const namePart = personName && personName.trim() ? ` (${personName.trim()})` : '';
+  const traitsPart =
+    personVisualDescription && personVisualDescription.trim()
+      ? ` Rasgos físicos exactos del sujeto original a preservar: ${personVisualDescription.trim()}.`
+      : '';
+  const ratioPart = aspectRatioLabel ? ` Formato y proporción de encuadre: ${aspectRatioLabel}.` : '';
 
-  return `Transformación de edad y estilo de retrato${namePart}: ${ageInstruction} Conserva la identidad facial exacta (ojos, nariz, boca, expresión y facciones). ${styleInstruction} Devuelve únicamente la imagen resultante en alta calidad.`;
+  return `Transformación de edad y estilo de retrato${namePart}: ${ageInstruction}${traitsPart}${ratioPart} Conserva la identidad facial exacta (ojos, nariz, boca, expresión y facciones). ${styleInstruction}`;
 };
 
-/**
- * Uses Gemini 3.8 Flash Vision (free tier active in preview) to extract the person's visual traits
- * so Puter.js / Pollinations.ai preserve the person's facial appearance.
- */
 const extractPersonDescriptionWithGemini = async (
   ai: GoogleGenAI | null,
   rawBase64: string,
@@ -73,14 +81,14 @@ const extractPersonDescriptionWithGemini = async (
           parts: [
             { inlineData: { data: rawBase64, mimeType } },
             {
-              text: 'Describe this person in 18 concise English words for a portrait prompt: gender, ethnicity, skin tone, hair style/color, eye color, facial hair or glasses if any, and expression.',
+              text: 'Describe this person in 22 concise English words for a portrait prompt: gender, ethnicity, skin tone, hair style/color, eye color, facial hair or glasses if any, clothing color, and expression.',
             },
           ],
         },
       ],
     });
 
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500));
     const res: any = await Promise.race([visionPromise, timeoutPromise]);
     return res?.text ? res.text.trim().replace(/\n+/g, ' ') : '';
   } catch {
@@ -89,10 +97,13 @@ const extractPersonDescriptionWithGemini = async (
 };
 
 /**
- * 3-Stage Real AI Transformation Pipeline:
- * 1. Priority 1: Google Gemini AI (gemini-3.1-flash-lite-image)
- * 2. Priority 2: Puter.js AI (puter.ai.txt2img with input_image)
- * 3. Emergency Priority 3: Pollinations.ai Neural Generator (assisted by Gemini Vision traits)
+ * 4-Stage Ultra-Robust Real AI Transformation Pipeline:
+ * 1. Priority 1: Google Gemini AI (gemini-3.1-flash-lite-image with native aspectRatio config)
+ * 2. Priority 2: Puter.js AI with authenticated JWT Token (no login popup, works on preview & domain)
+ * 3. Priority 3: Pollinations.ai Neural Generator (with matching width & height)
+ * 4. Priority 4: Black Forest Labs FLUX.1-schnell AI (Hugging Face Gradio v5 API with matching width & height)
+ *
+ * Every stage enforces the exact aspect ratio of the uploaded image before returning.
  */
 export const transformImageAge = async (
   base64ImageData: string,
@@ -107,15 +118,26 @@ export const transformImageAge = async (
   const rawBase64 = base64ImageData.includes(',')
     ? base64ImageData.split(',')[1]
     : base64ImageData;
-  const prompt = generatePrompt(targetAge, transformType, styleId, customStylePrompt, personName);
+
+  // Detect exact dimensions and aspect ratio of the user's uploaded photo
+  const dims = await getUploadedImageDimensions(base64ImageData, safeMime);
+  const basePrompt = generatePrompt(
+    targetAge,
+    transformType,
+    styleId,
+    customStylePrompt,
+    personName,
+    '',
+    dims.geminiAspectRatio
+  );
   const errors: string[] = [];
 
   const ai = getAIClient();
-
-  // Start Gemini Vision trait extraction in background (non-blocking) for fallback accuracy
   const visionTraitsPromise = extractPersonDescriptionWithGemini(ai, rawBase64, safeMime);
 
-  // 1. PRIORIDAD 1: Google Gemini AI
+  // ============================================================================
+  // 1. PRIORIDAD 1: Google Gemini AI (gemini-3.1-flash-lite-image)
+  // ============================================================================
   if (ai) {
     try {
       const apiPromise = ai.models.generateContent({
@@ -129,9 +151,14 @@ export const transformImageAge = async (
               },
             },
             {
-              text: prompt,
+              text: basePrompt,
             },
           ],
+        },
+        config: {
+          imageConfig: {
+            aspectRatio: dims.geminiAspectRatio,
+          },
         },
       });
 
@@ -145,8 +172,10 @@ export const transformImageAge = async (
         for (const part of candidate.content.parts) {
           if (part.inlineData?.data) {
             const mime = part.inlineData.mimeType || 'image/png';
+            const rawImg = `data:${mime};base64,${part.inlineData.data}`;
+            const finalImg = await enforceExactAspectRatio(rawImg, dims);
             return {
-              image: `data:${mime};base64,${part.inlineData.data}`,
+              image: finalImg,
               text: null,
             };
           }
@@ -154,52 +183,106 @@ export const transformImageAge = async (
       }
       errors.push('Gemini sin imagen');
     } catch (geminiErr: any) {
-      console.warn('Prioridad 1 (Gemini) falló, pasando a Prioridad 2 (Puter.js):', geminiErr?.message || geminiErr);
+      console.warn(
+        'Prioridad 1 (Gemini) no disponible, pasando a Prioridad 2 (Puter.js con token):',
+        geminiErr?.message || geminiErr
+      );
       errors.push(`Gemini: ${geminiErr?.status || 'cuota agotada'}`);
     }
   } else {
     errors.push('Gemini: sin clave');
   }
 
-  // 2. PRIORIDAD 2: Puter.js AI
+  const visualDescription = await visionTraitsPromise;
+  const enrichedPrompt = generatePrompt(
+    targetAge,
+    transformType,
+    styleId,
+    customStylePrompt,
+    personName,
+    visualDescription,
+    dims.geminiAspectRatio
+  );
+
+  // ============================================================================
+  // 2. PRIORIDAD 2: Puter.js AI (Token JWT integrado, sin registro)
+  // ============================================================================
   try {
-    const puterImage = await generateWithPuter(prompt, rawBase64, safeMime);
+    const puterImage = await generateWithPuter(enrichedPrompt, rawBase64, safeMime);
     if (puterImage && puterImage.length > 50) {
+      const finalImg = await enforceExactAspectRatio(puterImage, dims);
       return {
-        image: puterImage,
+        image: finalImg,
         text: null,
       };
     }
     errors.push('Puter.js sin imagen');
   } catch (puterErr: any) {
-    console.warn('Prioridad 2 (Puter.js) falló, activando emergencia Pollinations.ai:', puterErr?.message || puterErr);
-    errors.push(`Puter.js: ${puterErr?.message || 'no disponible'}`);
+    console.warn(
+      'Prioridad 2 (Puter.js) falló, pasando a Prioridad 3 (Pollinations.ai):',
+      puterErr?.message || puterErr
+    );
+    errors.push(`Puter.js: ${puterErr?.message || 'error'}`);
   }
 
-  // 3. EMERGENCIA (PRIORIDAD 3): Pollinations.ai
+  // ============================================================================
+  // 3. PRIORIDAD 3 (EMERGENCIA 1): Pollinations.ai
+  // ============================================================================
   try {
-    const visualDescription = await visionTraitsPromise;
     const pollinationsImage = await generateWithPollinations(
       targetAge,
       transformType,
       styleId,
       customStylePrompt,
       personName,
-      visualDescription
+      visualDescription,
+      dims.genWidth,
+      dims.genHeight
     );
     if (pollinationsImage && pollinationsImage.length > 50) {
+      const finalImg = await enforceExactAspectRatio(pollinationsImage, dims);
       return {
-        image: pollinationsImage,
+        image: finalImg,
         text: null,
       };
     }
     errors.push('Pollinations sin imagen');
   } catch (pollinationsErr: any) {
-    console.error('Emergencia Pollinations.ai también falló:', pollinationsErr?.message || pollinationsErr);
+    console.warn(
+      'Prioridad 3 (Pollinations.ai) falló, pasando a Prioridad 4 (FLUX.1 AI):',
+      pollinationsErr?.message || pollinationsErr
+    );
     errors.push(`Pollinations: ${pollinationsErr?.message || 'error'}`);
   }
 
+  // ============================================================================
+  // 4. PRIORIDAD 4 (EMERGENCIA 2 - 4TO RESPALDO): Black Forest Labs FLUX.1 AI
+  // ============================================================================
+  try {
+    const fluxImage = await generateWithFourthBackupAI(
+      targetAge,
+      transformType,
+      styleId,
+      customStylePrompt,
+      personName,
+      visualDescription,
+      dims.genWidth,
+      dims.genHeight
+    );
+    if (fluxImage && fluxImage.length > 50) {
+      const finalImg = await enforceExactAspectRatio(fluxImage, dims);
+      return {
+        image: finalImg,
+        text: null,
+      };
+    }
+    errors.push('FLUX.1 sin imagen');
+  } catch (fluxErr: any) {
+    console.error('Prioridad 4 (FLUX.1 AI) también falló:', fluxErr?.message || fluxErr);
+    errors.push(`FLUX.1: ${fluxErr?.message || 'error'}`);
+  }
+
   throw new Error(
-    `No se pudo completar la transformación (${errors.join(' → ')}). Intenta nuevamente.`
+    `No se pudo completar la transformación tras intentar los 4 motores de IA (${errors.join(' → ')}). Intenta nuevamente.`
   );
 };
